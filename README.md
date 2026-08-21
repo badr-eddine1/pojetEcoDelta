@@ -1,251 +1,241 @@
-# Projet Ecodelta — Application de Veille IA, CRM et Génération de Devis
+# Ecodelta — Plateforme de veille intelligente des appels d'offres
 
-Application développée dans le cadre du stage Ecodelta (2026). Initialement répartie en 3 pôles
-(Frontend / Backend-Crawling / IA-Données), l'ensemble du projet a été repris et développé en solo.
+Plateforme automatisant la veille des appels d'offres publics marocains, la gestion de la relation client, la génération de devis et de fiches techniques, avec surveillance continue et notification automatique par email.
 
-## Objectif
+Développée dans le cadre d'un stage chez **Ecodelta** (Rabat, Maroc), entreprise spécialisée en énergie solaire, sécurité périmétrique et contrôle d'accès, gestion de parking, affichage dynamique et effaroucheurs anti-volatiles.
 
-Automatiser 3 tâches manuelles de l'équipe Ecodelta via une application web à 3 modules :
-1. **Veille des appels d'offres** : scraper les AO marocains, les scorer par IA selon leur pertinence
-2. **CRM clients** : suivi des clients et génération de devis
-3. **Catalogue produits** : fiches techniques générées automatiquement
+---
 
-## Profil Ecodelta (utilisé pour le scoring IA et les fiches techniques)
+## Sommaire
 
-Ecodelta est spécialisée dans :
-- Énergie solaire (injection solaire, pompage solaire)
-- Sécurité périmétrique et contrôle d'accès
-- Gestion de parking
-- Affichage dynamique (murs d'image)
-- Effaroucheurs laser/acoustique
-- Construction de terrains de padel
+- [Fonctionnalités](#fonctionnalités)
+- [Architecture](#architecture)
+- [Stack technique](#stack-technique)
+- [Structure du projet](#structure-du-projet)
+- [Installation](#installation)
+- [Configuration (.env)](#configuration-env)
+- [Lancement](#lancement)
+- [Endpoints de l'API](#endpoints-de-lapi)
+- [Limites connues](#limites-connues)
 
-Secteurs clients ciblés : industrie, hôtellerie/tourisme, ports, aéroports, secteur public.
+---
+
+## Fonctionnalités
+
+- 🔍 **Collecte automatique** des appels d'offres depuis [marchespublics.gov.ma](https://www.marchespublics.gov.ma), filtrée par domaines d'activité pertinents pour Ecodelta
+- 🤖 **Scoring par intelligence artificielle** (OpenAI gpt-4o-mini) évaluant la pertinence de chaque appel d'offres, avec justification
+- 👥 **Gestion des clients** et d'un catalogue produits avec fiches techniques générées automatiquement
+- 💰 **Génération de devis** — calcul déterministe des montants (jamais par l'IA), validation humaine obligatoire avant tout envoi
+- ⏱️ **Surveillance automatique continue** (toutes les 10 minutes) : détection des nouveaux appels d'offres, scoring, notification — sans intervention manuelle
+- ✉️ **Notification email récapitulative** dès qu'un nouvel appel d'offres pertinent est détecté
+- 🖥️ **Interface web** (React) avec filtres Tous / Nouveaux / Pertinents / Non pertinents et tableau de bord de statistiques
+
+---
 
 ## Architecture
 
 ```
-ProjetEcodelta/
-├── ecodelta_backend/         # Scraping des appels d'offres
-│   ├── db.py                 # Connexion PostgreSQL
-│   ├── scraper_ao.py         # Scraper marchespublics.gov.ma
-│   └── .env                  # Config BDD (non versionné)
-│
-├── ecodelta_ai/               # Traitement IA + API
-│   ├── db.py                  # Connexion PostgreSQL (copie)
-│   ├── scoring.py              # Scoring des AO via API OpenAI
-│   ├── fiches_techniques.py    # Génération de fiches techniques produits
-│   ├── devis.py                # Génération de devis (client + produits)
-│   ├── main.py                 # API REST FastAPI (expose tout au frontend)
-│   └── .env                    # Config BDD + clé API (non versionné)
-│
-└── ecodelta_frontend/          # Interface React
-    └── src/
-        ├── App.jsx               # Navigation entre les 3 pages
-        ├── api.js                 # Appels vers l'API FastAPI
-        └── components/
-            ├── AppelsOffres.jsx   # Page 1 : AO triés par score
-            ├── Clients.jsx        # Page 2 : CRM + génération de devis
-            └── Produits.jsx       # Page 3 : catalogue produits
+Portail des marchés publics
+          │
+          ▼
+  Scraper (Playwright)  ──filtrage domaines──►  Base de données (PostgreSQL)
+          │                                              │
+          │                                              ▼
+   Scheduler (APScheduler,                      Scoring IA (OpenAI)
+   toutes les 10 min)                                     │
+          │                                              ▼
+          └──────────────────────────►     Notification email (SMTP)
+                                                           │
+                                                           ▼
+                                              API REST (FastAPI)
+                                                           │
+                                                           ▼
+                                              Interface web (React)
 ```
 
-## Base de données (PostgreSQL — `ecodelta_db`)
+Trois sous-projets indépendants, communiquant via une base de données PostgreSQL commune :
 
-| Table | Rôle |
+| Dossier | Rôle |
 |---|---|
-| `appels_offres` | AO scrapés + score IA + justification |
-| `clients` | Suivi client (module CRM) |
-| `produits` | Catalogue produits/prix Ecodelta |
-| `devis` | Devis générés (module génération) |
+| `ecodelta_ai/` | API REST (FastAPI) : appels d'offres, clients, produits, devis |
+| `ecodelta_frontend/` | Interface web (React + Vite) |
+| `ecodelta_surveillance/` | Pipeline automatique : scraping filtré, scoring, notification, scheduler |
 
-Schéma complet : voir les scripts SQL de création dans `ecodelta_backend/schema.sql` (à ajouter si besoin).
+---
 
-## 1. Scraper (`ecodelta_backend/scraper_ao.py`)
+## Stack technique
 
-Récupère les appels d'offres depuis **marchespublics.gov.ma**.
+| Catégorie | Technologies |
+|---|---|
+| Langages | Python, JavaScript (JSX), SQL |
+| Backend / IA | FastAPI, Playwright, psycopg2, APScheduler, smtplib |
+| Frontend | React, Vite |
+| Base de données | PostgreSQL |
+| IA | API OpenAI (gpt-4o-mini) |
+| Outils | Git, GitHub, VS Code, pgAdmin 4 |
 
-**Fonctionnement :**
-1. Navigue vers la recherche avancée
-2. Lance une recherche large (tous critères)
-3. Affiche 500 résultats par page
-4. Parcourt automatiquement toutes les pages (pagination)
-5. Parse chaque ligne (référence, titre, acheteur, lieu, date limite)
-6. Insère en base avec anti-doublons (vérification sur la référence)
+---
 
-**Lancer :**
-```bash
-cd ecodelta_backend
-venv\Scripts\activate
-python scraper_ao.py
+## Structure du projet
+
+```
+ProjetEcodelta/
+│
+├── ecodelta_ai/                    # API REST + logique métier
+│   ├── db.py                       # Connexion PostgreSQL
+│   ├── scoring.py                  # Scoring des AO par IA
+│   ├── fiches_techniques.py        # Génération de fiches produits
+│   ├── devis.py                    # Génération de devis
+│   ├── main.py                     # API FastAPI
+│   └── .env
+│
+├── ecodelta_frontend/               # Interface web
+│   └── src/
+│       ├── App.jsx
+│       ├── api.js
+│       └── components/
+│           ├── AppelsOffres.jsx
+│           ├── Clients.jsx
+│           └── Produits.jsx
+│
+└── ecodelta_surveillance/           # Pipeline automatique
+    ├── db.py
+    ├── domaines.py                 # Sélection auto des domaines d'activité
+    ├── scraper_ao.py                # Scraper avec filtrage intégré
+    ├── scoring.py
+    ├── notifications.py             # Envoi d'emails récapitulatifs
+    ├── surveillance.py              # Scheduler (boucle automatique)
+    ├── migration_surveillance.sql
+    └── .env
 ```
 
-**Résultat attendu :** insertion des nouveaux AO, les doublons déjà en base sont ignorés automatiquement.
+---
 
-## 2. Scoring IA (`ecodelta_ai/scoring.py`)
+## Installation
 
-Évalue chaque AO non encore scoré via l'API OpenAI (`gpt-4o-mini`), selon le vrai profil métier d'Ecodelta.
+Chaque dossier possède son propre environnement virtuel.
 
-**Fonctionnement :**
-- Récupère les AO où `score_ia IS NULL`
-- Envoie chacun à l'IA avec un prompt détaillant précisément ce qu'Ecodelta fait / ne fait pas
-- Reçoit un score de 0 à 10 + une justification
-- Enregistre directement en base (`score_ia`, `justification_ia`)
-- Traite par lots (500 par défaut) avec confirmation entre chaque lot
-- Affiche les tokens consommés et le coût estimé après chaque lot
-
-**Grille de notation :**
-- 8-10 : correspond directement à un domaine d'expertise Ecodelta
-- 4-7 : lien indirect possible
-- 0-3 : aucun rapport
-
-**Lancer :**
-```bash
-cd ecodelta_ai
-venv\Scripts\activate
-python scoring.py
-```
-
-**Voir les AO les plus pertinents (SQL) :**
-```sql
-SELECT titre, score_ia, justification_ia, date_limite, lien
-FROM appels_offres
-WHERE score_ia >= 7
-ORDER BY score_ia DESC;
-```
-
-## 3. Fiches techniques (`ecodelta_ai/fiches_techniques.py`)
-
-Génère automatiquement une fiche technique commerciale pour chaque produit du catalogue, via l'API OpenAI.
-
-**Fonctionnement :**
-- Récupère les produits où `fiche_technique IS NULL`
-- Génère : titre accrocheur, présentation orientée bénéfices, caractéristiques techniques, applications recommandées (2-3 secteurs max, sélectionnés et justifiés selon le produit — pas une liste générique des 5 secteurs à chaque fois), prix indicatif
-- Stocke le résultat en JSON dans la colonne `fiche_technique` (type `JSONB`)
-
-**Lancer :**
+### `ecodelta_ai/`
 ```bash
 cd ecodelta_ai
-python fiches_techniques.py
+python -m venv venv
+venv\Scripts\activate        # Windows
+pip install fastapi uvicorn psycopg2-binary python-dotenv openai
 ```
 
-**Prérequis BDD (une seule fois) :**
-```sql
-ALTER TABLE produits ADD COLUMN fiche_technique JSONB;
-```
-
-## 4. Génération de devis (`ecodelta_ai/devis.py`)
-
-Combine un client + une liste de produits/quantités pour générer un devis.
-
-**Fonctionnement :**
-- Les **calculs de prix sont faits en Python** (fiable, aucun risque d'erreur de calcul par l'IA)
-- L'IA rédige uniquement le texte d'introduction/conclusion, personnalisé selon le client
-- Le devis est enregistré en base avec `statut = "brouillon"` et `valide_par_humain = False`
-
-**Lancer (exemple) :**
-```python
-from devis import generer_devis
-generer_devis(client_id=1, produits_quantites=[(1, 2), (4, 1)])
-```
-
-**Règle de sécurité (conforme au brief) :** un devis généré par l'IA n'est jamais envoyé directement au client — il reste en statut `brouillon` jusqu'à validation humaine explicite (mise à jour manuelle de `valide_par_humain`).
-
-## 5. API REST (`ecodelta_ai/main.py`)
-
-Expose toutes les fonctionnalités précédentes via une API FastAPI, consommée par le frontend.
-
-**Endpoints principaux :**
-
-| Endpoint | Méthode | Rôle |
-|---|---|---|
-| `/appels-offres` | GET | Liste les AO, filtrable par `score_min` |
-| `/appels-offres/{id}` | GET | Détail d'un AO |
-| `/produits` | GET | Catalogue produits + fiches techniques |
-| `/clients` | GET / POST | Liste / création de clients |
-| `/devis` | GET / POST | Historique / génération d'un devis |
-| `/devis/{id}/valider` | PATCH | Validation humaine d'un devis (brouillon → validé/refusé) |
-
-**Lancer :**
-```bash
-cd ecodelta_ai
-pip install fastapi uvicorn
-uvicorn main:app --reload
-```
-
-**Documentation interactive (Swagger) :** une fois lancée, disponible sur `http://localhost:8000/docs` — permet de tester chaque endpoint directement dans le navigateur.
-
-## 6. Frontend (`ecodelta_frontend/`)
-
-Interface React (Vite) à 3 pages, connectée à l'API ci-dessus.
-
-- **Appels d'offres** : liste triée par score IA, filtre par score minimum, badges colorés (vert ≥8, orange ≥5, gris en dessous)
-- **Clients & Devis** : formulaire de génération de devis (choix client + produits/quantités), historique des devis avec actions de validation/refus
-- **Produits** : catalogue avec fiches techniques générées par IA (présentation, caractéristiques, applications)
-
-**Lancer :**
+### `ecodelta_frontend/`
 ```bash
 cd ecodelta_frontend
 npm install
-npm run dev
 ```
-Puis ouvrir `http://localhost:5173` (l'API doit tourner en parallèle sur le port 8000).
 
-## ⚠️ Données actuelles : fictives / de test
-
-Les tables `produits` et `clients` contiennent actuellement des **données de test**, construites à partir des informations publiques du site ecodelta.ma — **pas le vrai catalogue produits ni les vrais clients de l'entreprise**.
-
-Avant mise en production réelle, il faut :
-1. Récupérer le vrai catalogue produits/prix auprès du référent Ecodelta
-2. Récupérer une vraie liste de clients/prospects
-3. Vider les tables de test et importer les vraies données (`DELETE FROM produits; DELETE FROM clients;` puis import)
-
-Le code des 3 scripts IA (`scoring.py`, `fiches_techniques.py`, `devis.py`) n'a besoin d'aucune modification pour fonctionner avec les vraies données — seul le contenu des tables change.
-
-## Configuration (`.env`)
-
-Chaque dossier a son propre `.env` (non versionné, à créer localement) :
-
+### `ecodelta_surveillance/`
+```bash
+cd ecodelta_surveillance
+python -m venv venv
+venv\Scripts\activate
+pip install playwright psycopg2-binary python-dotenv openai apscheduler
+playwright install
 ```
+
+### Base de données
+Exécuter dans pgAdmin (ou `psql`) :
+```sql
+-- Schéma initial (tables appels_offres, clients, produits, devis)
+-- puis :
+\i ecodelta_surveillance/migration_surveillance.sql
+```
+
+---
+
+## Configuration (.env)
+
+### `ecodelta_ai/.env`
+```env
 DB_HOST=localhost
 DB_PORT=5432
 DB_NAME=ecodelta_db
 DB_USER=postgres
-DB_PASSWORD=xxx
+DB_PASSWORD=ton_mot_de_passe
 
-# Uniquement dans ecodelta_ai
-OPENAI_API_KEY=xxx
+OPENAI_API_KEY=ta_cle_openai
 ```
 
-⚠️ Ne jamais committer `.env` — protégé par `.gitignore`.
+### `ecodelta_surveillance/.env`
+```env
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=ecodelta_db
+DB_USER=postgres
+DB_PASSWORD=ton_mot_de_passe
 
-## Résultats (dernier passage complet)
+OPENAI_API_KEY=ta_cle_openai
 
-- **~3900 AO** scrapés depuis marchespublics.gov.ma
-- **37 AO** identifiés comme réellement pertinents (score ≥ 7)
-- **9 fiches techniques** générées (catalogue de test)
-- **Devis générés et validés** via l'application complète (pipeline bout en bout testé)
-- Coût API total cumulé (scoring + fiches + devis) : quelques centimes (gpt-4o-mini)
+SCRAP_INTERVAL_MINUTES=10
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=ton_email@gmail.com
+SMTP_PASSWORD=mot_de_passe_application
+NOTIFICATION_EMAIL_TO=contact@ecodelta.ma
+SEUIL_NOTIFICATION=7
+```
 
-## Prochaines étapes
-
-- [x] Scoring IA des appels d'offres
-- [x] Génération de fiches techniques
-- [x] Génération de devis (pipeline de base)
-- [x] API REST (FastAPI)
-- [x] Frontend React (3 pages fonctionnelles)
-- [ ] Remplacer les données de test par le vrai catalogue produits et les vrais clients Ecodelta
-- [ ] Ajouter la TVA / conditions de paiement dans le calcul des devis
-- [ ] Pré-filtrage par mots-clés au niveau du scraper (réduire le volume brut)
-- [ ] Automatisation de l'exécution périodique du scraper (planification quotidienne/hebdomadaire)
-- [ ] Export PDF des fiches techniques et devis (actuellement JSON/texte uniquement)
-- [ ] Authentification / gestion des utilisateurs (si nécessaire pour la mise en production)
-
-## Stack technique
-
-- **Python** (Playwright pour le scraping, psycopg2 pour PostgreSQL, FastAPI pour l'API)
-- **PostgreSQL** (base de données commune aux 3 modules)
-- **API OpenAI** (`gpt-4o-mini`) pour le scoring, les fiches techniques et la rédaction des devis
-- **React (Vite)** pour le frontend
+> ⚠️ Pour Gmail, `SMTP_PASSWORD` doit être un **mot de passe d'application** (généré via [myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords)), pas le mot de passe du compte.
 
 ---
-*Stage Ecodelta 2026*
+
+## Lancement
+
+Trois processus séparés, dans trois terminaux :
+
+```bash
+# Terminal 1 — API REST
+cd ecodelta_ai
+venv\Scripts\activate
+uvicorn main:app --reload
+
+# Terminal 2 — Interface web
+cd ecodelta_frontend
+npm run dev
+
+# Terminal 3 — Surveillance automatique (le cœur du système)
+cd ecodelta_surveillance
+venv\Scripts\activate
+python surveillance.py
+```
+
+Le Terminal 3 tourne en continu : il lance un premier cycle immédiatement puis se relance automatiquement toutes les `SCRAP_INTERVAL_MINUTES` (Ctrl+C pour arrêter).
+
+---
+
+## Endpoints de l'API
+
+| Endpoint | Méthode | Description |
+|---|---|---|
+| `/appels-offres` | GET | Liste complète, filtrable par `score_min` |
+| `/appels-offres/nouveaux` | GET | AO détectés dans les dernières 24h |
+| `/appels-offres/pertinents` | GET | AO au score ≥ seuil |
+| `/appels-offres/non-pertinents` | GET | AO scorés mais sous le seuil |
+| `/appels-offres/{id}` | GET | Détail complet d'un AO |
+| `/produits` | GET | Catalogue produits + fiches techniques |
+| `/clients` | GET / POST | Liste / création de clients |
+| `/devis` | GET / POST | Historique / génération de devis |
+| `/devis/{id}/valider` | PATCH | Validation humaine d'un devis |
+| `/surveillance/stats` | GET | Statistiques agrégées (nouveaux, pertinents, notifiés) |
+
+Documentation interactive disponible sur `http://localhost:8000/docs` une fois l'API lancée.
+
+---
+
+## Limites connues
+
+- **Pas de temps réel strict** : le portail des marchés publics ne propose aucune API/webhook ; la détection repose sur un polling périodique (délai maximal = intervalle configuré, 10 min par défaut)
+- **Données de test** : catalogue produits et répertoire clients à remplacer par les données réelles d'Ecodelta
+- **Pas de TVA** ni de conditions de paiement dans le calcul actuel des devis
+- **Pas d'export PDF** des devis/fiches techniques pour le moment
+
+---
+
+## Auteur
+
+**AITBEN IJJA Badr-Eddine** — Stagiaire, EMSI Marrakech, Ingénierie Informatique et Data Science
