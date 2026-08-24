@@ -9,8 +9,8 @@ body {
 
 .navbar {
   background: white;
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;   /* logo | liens centrés | espace vide */
   align-items: center;
   padding: 12px 32px;
   box-shadow: 0 2px 6px rgba(0,0,0,0.06);
@@ -18,7 +18,17 @@ body {
   top: 0;
   z-index: 10;
 }
-
+ 
+.navbar .logo-img {
+  justify-self: start;   /* logo collé à gauche */
+}
+ 
+.nav-links {
+  grid-column: 2;
+  justify-self: center;   /* liens toujours au centre exact de la barre */
+  display: flex;
+  gap: 4px;
+}
 .logo-img {
   height: 42px;
   object-fit: contain;
@@ -47,8 +57,9 @@ body {
 }
 
 main {
-  max-width: 1500px;
-  margin: 0 auto;
+   width: 100%;
+   max-width: none;
+   margin: 0;
   padding: 32px 40px;
 }
 
