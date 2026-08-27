@@ -155,13 +155,14 @@ def detail_appel_offre(ao_id: int):
 
 
 # ---------- Produits ----------
-
 @app.get("/produits")
 def liste_produits():
     conn = get_connection()
     cur = conn.cursor()
-    cur.execute("SELECT id, nom, description, prix_unitaire, specs_techniques, fiche_technique FROM produits;")
-    colonnes = ["id", "nom", "description", "prix_unitaire", "specs_techniques", "fiche_technique"]
+    cur.execute(
+        "SELECT id, nom, description, prix_unitaire, specs_techniques, fiche_technique, image_url FROM produits;"
+    )
+    colonnes = ["id", "nom", "description", "prix_unitaire", "specs_techniques", "fiche_technique", "image_url"]
     resultats = []
     for row in cur.fetchall():
         d = dict(zip(colonnes, row))
