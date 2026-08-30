@@ -24,11 +24,12 @@ Développée dans le cadre d'un stage chez **Ecodelta** (Rabat, Maroc), entrepri
 
 - 🔍 **Collecte automatique** des appels d'offres depuis [marchespublics.gov.ma](https://www.marchespublics.gov.ma), filtrée par domaines d'activité pertinents pour Ecodelta
 - 🤖 **Scoring par intelligence artificielle** (OpenAI gpt-4o-mini) évaluant la pertinence de chaque appel d'offres, avec justification
-- 👥 **Gestion des clients** et d'un catalogue produits avec fiches techniques générées automatiquement
+- 📦 **Catalogue produits réel**, récupéré directement depuis l'API publique WooCommerce du site [ecodelta.ma](https://ecodelta.ma) (nom, description, image, catégories), avec fiches techniques commerciales générées automatiquement par IA
+- 👥 **Gestion des clients**
 - 💰 **Génération de devis** — calcul déterministe des montants (jamais par l'IA), validation humaine obligatoire avant tout envoi
 - ⏱️ **Surveillance automatique continue** (toutes les 10 minutes) : détection des nouveaux appels d'offres, scoring, notification — sans intervention manuelle
 - ✉️ **Notification email récapitulative** dès qu'un nouvel appel d'offres pertinent est détecté
-- 🖥️ **Interface web** (React) avec filtres Tous / Nouveaux / Pertinents / Non pertinents et tableau de bord de statistiques
+- 🖥️ **Interface web** (React) avec filtres Tous / Nouveaux / Pertinents / Non pertinents, tableau de bord de statistiques, et fenêtres de détail au clic (appels d'offres et produits)
 
 ---
 
@@ -85,6 +86,7 @@ ProjetEcodelta/
 │   ├── db.py                       # Connexion PostgreSQL
 │   ├── scoring.py                  # Scoring des AO par IA
 │   ├── fiches_techniques.py        # Génération de fiches produits
+│   ├── scraper_produits.py         # Récupération du catalogue réel (API WooCommerce ecodelta.ma)
 │   ├── devis.py                    # Génération de devis
 │   ├── main.py                     # API FastAPI
 │   └── .env
@@ -227,10 +229,29 @@ Documentation interactive disponible sur `http://localhost:8000/docs` une fois l
 
 ---
 
+## Collecte du catalogue produits
+
+Contrairement au module de veille des appels d'offres (qui doit scraper le HTML rendu du portail des marchés publics via Playwright, faute d'API), le catalogue produits d'Ecodelta est récupéré via une méthode plus simple et plus fiable :
+
+**Le site ecodelta.ma utilise WooCommerce, qui expose une API JSON publique** (`/wp-json/wc/store/v1/products`), normalement prévue pour les fonctionnalités de panier/paiement du site. Cette API permet de récupérer tout le catalogue (nom, description, image, catégories) de façon structurée, sans avoir à parser du HTML — pas besoin de navigateur automatisé ici, une simple requête `requests` suffit.
+
+```bash
+cd ecodelta_ai
+python scraper_produits.py
+```
+
+Points importants :
+- **Aucun prix n'est affiché publiquement** sur le site (modèle « sur devis ») : le champ `prix_unitaire` reste donc `NULL` pour les produits scrapés, et l'interface affiche « Sur devis » à la place
+- **Dédoublonnage par `source_id`** (l'identifiant unique WooCommerce), pas par nom : plusieurs produits du catalogue réel partagent des noms identiques ou très proches, un dédoublonnage par nom en perdrait donc à tort
+- Une fois le catalogue importé, `fiches_techniques.py` peut être exécuté sur ces produits réels pour générer leurs fiches commerciales par IA, exactement comme pour les données de test utilisées initialement
+
+---
+
 ## Limites connues
 
 - **Pas de temps réel strict** : le portail des marchés publics ne propose aucune API/webhook ; la détection repose sur un polling périodique (délai maximal = intervalle configuré, 10 min par défaut)
-- **Données de test** : catalogue produits et répertoire clients à remplacer par les données réelles d'Ecodelta
+- **Répertoire clients** encore en données de test, à remplacer par les vrais clients d'Ecodelta
+- **Fiches techniques IA** pas encore régénérées sur l'ensemble du catalogue réel (99 produits) — à relancer via `fiches_techniques.py`
 - **Pas de TVA** ni de conditions de paiement dans le calcul actuel des devis
 - **Pas d'export PDF** des devis/fiches techniques pour le moment
 
@@ -238,4 +259,4 @@ Documentation interactive disponible sur `http://localhost:8000/docs` une fois l
 
 ## Auteur
 
-**AITBEN IJJA Badr-Eddine** — Stagiaire, EMSI Marrakech, Ingénierie Informatique et Data Science
+**AITBEN IJJA Badr-Eddine** 
