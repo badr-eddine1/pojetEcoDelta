@@ -6,6 +6,8 @@ import json
 
 from db import get_connection
 from devis import recuperer_client, recuperer_produits, rediger_texte_devis
+from devis_pdf import generer_pdf_devis
+from fastapi.responses import Response
 
 app = FastAPI(title="Ecodelta API", version="2.0")
 
@@ -245,9 +247,11 @@ def creer_devis(devis: DevisCreate):
 
     cur = conn.cursor()
     cur.execute(
-        """INSERT INTO devis (client_id, produits, montant_total, statut, genere_par_ia, valide_par_humain)
-           VALUES (%s, %s, %s, 'brouillon', TRUE, FALSE) RETURNING id;""",
-        (devis.client_id, json.dumps(lignes, ensure_ascii=False), montant_total),
+        """INSERT INTO devis (client_id, produits, montant_total, statut, genere_par_ia,
+                               valide_par_humain, introduction_ia, conclusion_ia)
+           VALUES (%s, %s, %s, 'brouillon', TRUE, FALSE, %s, %s) RETURNING id;""",
+        (devis.client_id, json.dumps(lignes, ensure_ascii=False), montant_total,
+         textes["introduction"], textes["conclusion"]),
     )
     devis_id = cur.fetchone()[0]
     conn.commit()
@@ -282,6 +286,46 @@ def valider_devis(devis_id: int, validation: DevisValidation):
     if not row:
         raise HTTPException(status_code=404, detail="Devis introuvable")
     return {"id": devis_id, "statut": nouveau_statut}
+
+
+@app.get("/devis/{devis_id}/pdf")
+def telecharger_devis_pdf(devis_id: int):
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute(
+        """SELECT d.id, c.nom, c.email, c.telephone, d.produits, d.montant_total,
+                  d.statut, d.introduction_ia, d.conclusion_ia, d.date_creation
+           FROM devis d JOIN clients c ON d.client_id = c.id
+           WHERE d.id = %s;""",
+        (devis_id,),
+    )
+    row = cur.fetchone()
+    cur.close()
+    conn.close()
+
+    if not row:
+        raise HTTPException(status_code=404, detail="Devis introuvable")
+
+    devis_data = {
+        "id": row[0],
+        "client_nom": row[1],
+        "client_email": row[2],
+        "client_telephone": row[3],
+        "lignes": row[4],
+        "montant_total": float(row[5]),
+        "statut": row[6],
+        "introduction_ia": row[7],
+        "conclusion_ia": row[8],
+        "date_creation": row[9].isoformat() if row[9] else None,
+    }
+
+    pdf_bytes = generer_pdf_devis(devis_data)
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="devis_{devis_id}.pdf"'},
+    )
 
 
 # ---------- Statistiques de surveillance ----------
