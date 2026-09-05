@@ -462,3 +462,162 @@ th, td {
 .btn-pdf:hover {
   background: #b91c1c;
 }
+
+
+
+
+.login-page {
+  width: 100%;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #f0fdf4 0%, #f5f6f8 50%, #e8f5ec 100%);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Formes décoratives en fond, dans l'esprit vert Ecodelta */
+.login-fond-decoratif {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 15% 20%, rgba(22, 163, 74, 0.08) 0%, transparent 40%),
+    radial-gradient(circle at 85% 80%, rgba(22, 163, 74, 0.10) 0%, transparent 40%);
+}
+
+.login-carte {
+  position: relative;
+  background: white;
+  padding: 44px 40px;
+  border-radius: 16px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.10), 0 2px 8px rgba(0, 0, 0, 0.04);
+  width: 100%;
+  max-width: 380px;
+  display: flex;
+  flex-direction: column;
+  animation: apparition 0.35s ease-out;
+}
+
+@keyframes apparition {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.login-logo {
+  height: 48px;
+  object-fit: contain;
+  align-self: center;
+  margin-bottom: 20px;
+}
+
+.login-carte h1 {
+  color: #111827;
+  margin: 0 0 4px;
+  text-align: center;
+  font-size: 24px;
+}
+
+.login-soustitre {
+  color: #6b7280;
+  text-align: center;
+  margin: 0 0 28px;
+  font-size: 13.5px;
+  line-height: 1.4;
+}
+
+.login-erreur {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  font-size: 13.5px;
+}
+
+.login-carte label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 6px;
+  margin-top: 14px;
+}
+
+.login-champ {
+  display: flex;
+  align-items: center;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 0 12px;
+  transition: border-color 0.15s;
+  background: #fafafa;
+}
+
+.login-champ:focus-within {
+  border-color: #16a34a;
+  background: white;
+  box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.1);
+}
+
+.login-icone {
+  font-size: 14px;
+  margin-right: 8px;
+  opacity: 0.6;
+}
+
+.login-champ input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  padding: 11px 0;
+  font-size: 14.5px;
+  outline: none;
+}
+
+.login-toggle-mdp {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 15px;
+  padding: 4px;
+  opacity: 0.6;
+}
+
+.login-toggle-mdp:hover {
+  opacity: 1;
+}
+
+.login-btn-submit {
+  margin-top: 26px;
+  width: 100%;
+  padding: 13px;
+  font-size: 15px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(22, 163, 74, 0.25);
+}
+
+.login-footer {
+  text-align: center;
+  color: #9ca3af;
+  font-size: 12px;
+  margin-top: 22px;
+  margin-bottom: 0;
+}
+
+/* Bouton de déconnexion dans la navbar (3e colonne de la grille) */
+.btn-deconnexion {
+  grid-column: 3;
+  justify-self: end;
+  background: #f3f4f6;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  color: #4b5563;
+}
+
+.btn-deconnexion:hover {
+  background: #e5e7eb;
+}

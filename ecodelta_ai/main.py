@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
@@ -8,6 +8,8 @@ from db import get_connection
 from devis import recuperer_client, recuperer_produits, rediger_texte_devis
 from devis_pdf import generer_pdf_devis
 from fastapi.responses import Response
+from fastapi.security import OAuth2PasswordRequestForm
+from auth import verifier_mot_de_passe, creer_token, get_current_user
 
 app = FastAPI(title="Ecodelta API", version="2.0")
 
@@ -17,6 +19,24 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.post("/login")
+def login(form_data: OAuth2PasswordRequestForm = Depends()):
+    email = form_data.username.strip().lower()  # normalisation : évite les faux 401 dus à la casse
+
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT mot_de_passe_hash FROM users WHERE email = %s;", (email,))
+    row = cur.fetchone()
+    cur.close()
+    conn.close()
+
+    if not row or not verifier_mot_de_passe(form_data.password, row[0]):
+        raise HTTPException(status_code=401, detail="Email ou mot de passe incorrect")
+
+    token = creer_token(email)
+    return {"access_token": token, "token_type": "bearer"}
 
 
 class ProduitDevis(BaseModel):
@@ -60,7 +80,7 @@ def _formatter_ao(row):
 
 # ---------- Appels d'offres : vue générale ----------
 
-@app.get("/appels-offres")
+@app.get("/appels-offres", dependencies=[Depends(get_current_user)])
 def liste_appels_offres(score_min: Optional[float] = None, limit: int = 100):
     """Vue 'Tous' : liste complète, filtrable par score minimum."""
     conn = get_connection()
@@ -77,7 +97,7 @@ def liste_appels_offres(score_min: Optional[float] = None, limit: int = 100):
 
 # ---------- Appels d'offres : vue "Nouveaux" ----------
 
-@app.get("/appels-offres/nouveaux")
+@app.get("/appels-offres/nouveaux", dependencies=[Depends(get_current_user)])
 def liste_nouveaux_appels_offres(heures: int = 24, limit: int = 200):
     """
     Vue 'Nouveaux' : AO détectés récemment (par défaut les dernières 24h),
@@ -98,7 +118,7 @@ def liste_nouveaux_appels_offres(heures: int = 24, limit: int = 200):
 
 # ---------- Appels d'offres : vue "Pertinents" ----------
 
-@app.get("/appels-offres/pertinents")
+@app.get("/appels-offres/pertinents", dependencies=[Depends(get_current_user)])
 def liste_ao_pertinents(seuil: float = 7, limit: int = 200):
     """Vue 'Pertinents' : score_ia >= seuil (7 par défaut, aligné sur SEUIL_NOTIFICATION)."""
     conn = get_connection()
@@ -112,7 +132,7 @@ def liste_ao_pertinents(seuil: float = 7, limit: int = 200):
 
 # ---------- Appels d'offres : vue "Non pertinents" ----------
 
-@app.get("/appels-offres/non-pertinents")
+@app.get("/appels-offres/non-pertinents", dependencies=[Depends(get_current_user)])
 def liste_ao_non_pertinents(seuil: float = 7, limit: int = 200):
     """Vue 'Non pertinents' : AO déjà scorés mais sous le seuil."""
     conn = get_connection()
@@ -128,7 +148,7 @@ def liste_ao_non_pertinents(seuil: float = 7, limit: int = 200):
     return resultats
 
 
-@app.get("/appels-offres/{ao_id}")
+@app.get("/appels-offres/{ao_id}", dependencies=[Depends(get_current_user)])
 def detail_appel_offre(ao_id: int):
     conn = get_connection()
     cur = conn.cursor()
@@ -157,7 +177,7 @@ def detail_appel_offre(ao_id: int):
 
 
 # ---------- Produits ----------
-@app.get("/produits")
+@app.get("/produits", dependencies=[Depends(get_current_user)])
 def liste_produits():
     conn = get_connection()
     cur = conn.cursor()
@@ -177,7 +197,7 @@ def liste_produits():
 
 # ---------- Clients ----------
 
-@app.get("/clients")
+@app.get("/clients", dependencies=[Depends(get_current_user)])
 def liste_clients():
     conn = get_connection()
     cur = conn.cursor()
@@ -189,7 +209,7 @@ def liste_clients():
     return resultats
 
 
-@app.post("/clients")
+@app.post("/clients", dependencies=[Depends(get_current_user)])
 def creer_client(client: ClientCreate):
     conn = get_connection()
     cur = conn.cursor()
@@ -206,7 +226,7 @@ def creer_client(client: ClientCreate):
 
 # ---------- Devis ----------
 
-@app.get("/devis")
+@app.get("/devis", dependencies=[Depends(get_current_user)])
 def liste_devis():
     conn = get_connection()
     cur = conn.cursor()
@@ -227,7 +247,7 @@ def liste_devis():
     return resultats
 
 
-@app.post("/devis")
+@app.post("/devis", dependencies=[Depends(get_current_user)])
 def creer_devis(devis: DevisCreate):
     conn = get_connection()
     try:
@@ -270,7 +290,7 @@ def creer_devis(devis: DevisCreate):
     }
 
 
-@app.patch("/devis/{devis_id}/valider")
+@app.patch("/devis/{devis_id}/valider", dependencies=[Depends(get_current_user)])
 def valider_devis(devis_id: int, validation: DevisValidation):
     conn = get_connection()
     cur = conn.cursor()
@@ -288,7 +308,7 @@ def valider_devis(devis_id: int, validation: DevisValidation):
     return {"id": devis_id, "statut": nouveau_statut}
 
 
-@app.get("/devis/{devis_id}/pdf")
+@app.get("/devis/{devis_id}/pdf", dependencies=[Depends(get_current_user)])
 def telecharger_devis_pdf(devis_id: int):
     conn = get_connection()
     cur = conn.cursor()
@@ -330,7 +350,7 @@ def telecharger_devis_pdf(devis_id: int):
 
 # ---------- Statistiques de surveillance ----------
 
-@app.get("/surveillance/stats")
+@app.get("/surveillance/stats", dependencies=[Depends(get_current_user)])
 def stats_surveillance():
     """Petit tableau de bord : combien de nouveaux/pertinents/notifiés, utile pour le frontend."""
     conn = get_connection()

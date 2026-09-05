@@ -194,8 +194,8 @@ Trois processus séparés, dans trois terminaux :
 # Terminal 1 — API REST
 cd ecodelta_ai
 venv\Scripts\activate
-uvicorn main:app --reload
 
+uvicorn main:app --reload
 # Terminal 2 — Interface web
 cd ecodelta_frontend
 npm run dev
