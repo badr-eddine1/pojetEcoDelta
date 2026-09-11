@@ -1,5 +1,21 @@
 import { useEffect, useState } from "react";
-import { getClients, getProduits, creerDevis, getDevis, validerDevis } from "../api";
+import { getClients, getProduits, creerDevis, getDevis, validerDevis, telechargerDevisPdf } from "../api";
+
+async function telechargerPdf(devisId) {
+  try {
+    const blob = await telechargerDevisPdf(devisId);
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `devis_${devisId}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
+  } catch (e) {
+    alert("Erreur lors du téléchargement du PDF : " + e.message);
+  }
+}
 
 export default function Clients() {
   const [clients, setClients] = useState([]);
@@ -136,14 +152,9 @@ export default function Clients() {
             <p className="montant-total">Total : {devisGenere.montant_total.toLocaleString("fr-FR")} MAD</p>
             <p>{devisGenere.conclusion}</p>
             <p className="alerte">⚠️ Devis généré par IA — statut : brouillon, à valider avant envoi</p>
-            <a
-              href={`http://localhost:8000/devis/${devisGenere.id}/pdf`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn-pdf"
-            >
+            <button onClick={() => telechargerPdf(devisGenere.id)} className="btn-pdf">
               📄 Télécharger le PDF
-            </a>
+            </button>
           </div>
         )}
       </div>
@@ -203,15 +214,13 @@ export default function Clients() {
                         <button onClick={() => marquerValide(d.id, false)} className="btn-refuser">✕ Refuser</button>
                       </>
                     )}
-                    <a
-                      href={`http://localhost:8000/devis/${d.id}/pdf`}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                    <button
+                      onClick={() => telechargerPdf(d.id)}
                       className="btn-pdf"
                       title="Télécharger le devis en PDF"
                     >
                       📄 PDF
-                    </a>
+                    </button>
                   </td>
                 </tr>
               );

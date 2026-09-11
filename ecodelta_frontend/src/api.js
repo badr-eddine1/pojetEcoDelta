@@ -149,3 +149,26 @@ export async function supprimerMotCle(id) {
   if (!res.ok) throw new Error("Erreur lors de la suppression du mot-clé");
   return res.json();
 }
+
+// ---------- Téléchargement PDF (nécessite le jeton, donc pas un simple <a href>) ----------
+
+export async function telechargerDevisPdf(devisId) {
+  const res = await requeteAuth(`${API_URL}/devis/${devisId}/pdf`);
+  if (!res.ok) throw new Error("Erreur lors du téléchargement du PDF");
+  return res.blob();
+}
+
+// ---------- Produits : ajout manuel ----------
+
+export async function creerProduit(produit) {
+  const res = await requeteAuth(`${API_URL}/produits`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(produit),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Erreur lors de la création du produit");
+  }
+  return res.json();
+}

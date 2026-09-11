@@ -195,6 +195,42 @@ def liste_produits():
     return resultats
 
 
+class ProduitCreate(BaseModel):
+    nom: str
+    description: Optional[str] = None
+    prix_unitaire: Optional[float] = None
+    specs_techniques: Optional[str] = None
+
+
+@app.post("/produits", dependencies=[Depends(get_current_user)])
+def creer_produit(produit: ProduitCreate):
+    nom = produit.nom.strip()
+    if not nom:
+        raise HTTPException(status_code=400, detail="Le nom du produit ne peut pas être vide")
+
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute(
+        """INSERT INTO produits (nom, description, prix_unitaire, specs_techniques)
+           VALUES (%s, %s, %s, %s) RETURNING id;""",
+        (nom, produit.description, produit.prix_unitaire, produit.specs_techniques),
+    )
+    nouveau_id = cur.fetchone()[0]
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    return {
+        "id": nouveau_id,
+        "nom": nom,
+        "description": produit.description,
+        "prix_unitaire": produit.prix_unitaire,
+        "specs_techniques": produit.specs_techniques,
+        "fiche_technique": None,
+        "image_url": None,
+    }
+
+
 # ---------- Clients ----------
 
 @app.get("/clients", dependencies=[Depends(get_current_user)])

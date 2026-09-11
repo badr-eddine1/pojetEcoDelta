@@ -253,7 +253,7 @@ Points importants :
 - **Répertoire clients** encore en données de test, à remplacer par les vrais clients d'Ecodelta
 - **Fiches techniques IA** pas encore régénérées sur l'ensemble du catalogue réel (99 produits) — à relancer via `fiches_techniques.py`
 - **Pas de TVA** ni de conditions de paiement dans le calcul actuel des devis
-- **Pas d'export PDF** des devis/fiches techniques pour le moment
+- **Pas d'export PDF** /fiches techniques pour le moment
 
 ---
 
