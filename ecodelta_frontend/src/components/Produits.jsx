@@ -7,11 +7,14 @@ export default function Produits() {
   const [erreur, setErreur] = useState(null);
   const [detail, setDetail] = useState(null);
 
+  const [recherche, setRecherche] = useState("");
   const [afficherFormulaire, setAfficherFormulaire] = useState(false);
   const [nouveauNom, setNouveauNom] = useState("");
   const [nouvelleDescription, setNouvelleDescription] = useState("");
   const [nouveauPrix, setNouveauPrix] = useState("");
   const [nouvellesSpecs, setNouvellesSpecs] = useState("");
+  const [nouvelleImage, setNouvelleImage] = useState(null);
+  const [apercuImage, setApercuImage] = useState(null);
   const [envoiEnCours, setEnvoiEnCours] = useState(false);
   const [erreurFormulaire, setErreurFormulaire] = useState(null);
 
@@ -27,6 +30,16 @@ export default function Produits() {
     charger();
   }, []);
 
+  function gererSelectionImage(e) {
+    const fichier = e.target.files[0];
+    setNouvelleImage(fichier || null);
+    if (fichier) {
+      setApercuImage(URL.createObjectURL(fichier));
+    } else {
+      setApercuImage(null);
+    }
+  }
+
   function ouvrirDetail(produit) {
     setDetail(produit);
   }
@@ -40,6 +53,8 @@ export default function Produits() {
     setNouvelleDescription("");
     setNouveauPrix("");
     setNouvellesSpecs("");
+    setNouvelleImage(null);
+    setApercuImage(null);
     setErreurFormulaire(null);
   }
 
@@ -53,12 +68,14 @@ export default function Produits() {
     setEnvoiEnCours(true);
     setErreurFormulaire(null);
     try {
-      await creerProduit({
-        nom: nouveauNom.trim(),
-        description: nouvelleDescription.trim() || null,
-        prix_unitaire: nouveauPrix ? parseFloat(nouveauPrix) : null,
-        specs_techniques: nouvellesSpecs.trim() || null,
-      });
+      const formData = new FormData();
+      formData.append("nom", nouveauNom.trim());
+      if (nouvelleDescription.trim()) formData.append("description", nouvelleDescription.trim());
+      if (nouveauPrix) formData.append("prix_unitaire", parseFloat(nouveauPrix));
+      if (nouvellesSpecs.trim()) formData.append("specs_techniques", nouvellesSpecs.trim());
+      if (nouvelleImage) formData.append("image", nouvelleImage);
+
+      await creerProduit(formData);
       reinitialiserFormulaire();
       setAfficherFormulaire(false);
       charger(); // recharge la liste pour inclure le nouveau produit
@@ -71,6 +88,17 @@ export default function Produits() {
 
   if (loading) return <p>Chargement...</p>;
   if (erreur) return <p className="erreur">Erreur : {erreur}</p>;
+
+  const termeRecherche = recherche.trim().toLowerCase();
+  const produitsFiltres = termeRecherche
+    ? produits.filter((p) => {
+        const nomAffiche = (p.fiche_technique ? p.fiche_technique.titre : p.nom) || "";
+        return (
+          nomAffiche.toLowerCase().includes(termeRecherche) ||
+          (p.description || "").toLowerCase().includes(termeRecherche)
+        );
+      })
+    : produits;
 
   return (
     <div className="page">
@@ -87,6 +115,20 @@ export default function Produits() {
       <p className="compteur">
         {produits.length} produit(s) — catalogue issu du site ecodelta.ma, complété manuellement
       </p>
+
+      <input
+        type="text"
+        value={recherche}
+        onChange={(e) => setRecherche(e.target.value)}
+        placeholder="🔍 Rechercher un produit (nom, description...)"
+        style={{ width: "100%", padding: "10px 14px", marginBottom: 16, borderRadius: 8, border: "1px solid #d1d5db" }}
+      />
+
+      {termeRecherche && (
+        <p className="compteur">
+          {produitsFiltres.length} résultat(s) pour « {recherche} »
+        </p>
+      )}
 
       {afficherFormulaire && (
         <form onSubmit={ajouterProduit} className="section">
@@ -129,8 +171,23 @@ export default function Produits() {
             onChange={(e) => setNouvellesSpecs(e.target.value)}
             placeholder="Alimentation, dimensions, matériaux..."
             rows={3}
-            style={{ width: "100%", marginBottom: 14 }}
+            style={{ width: "100%", marginBottom: 10 }}
           />
+
+          <label>Image du produit</label>
+          <input
+            type="file"
+            accept="image/png, image/jpeg, image/webp, image/gif"
+            onChange={gererSelectionImage}
+            style={{ display: "block", marginBottom: 10 }}
+          />
+          {apercuImage && (
+            <img
+              src={apercuImage}
+              alt="Aperçu"
+              style={{ maxWidth: 160, maxHeight: 160, borderRadius: 8, marginBottom: 14, display: "block" }}
+            />
+          )}
 
           <button type="submit" className="btn-principal" disabled={envoiEnCours}>
             {envoiEnCours ? "Ajout en cours..." : "Ajouter le produit"}
@@ -139,7 +196,7 @@ export default function Produits() {
       )}
 
       <div className="liste-cartes">
-        {produits.map((p) => {
+        {produitsFiltres.map((p) => {
           const fiche = p.fiche_technique;
           return (
             <div
@@ -159,6 +216,9 @@ export default function Produits() {
             </div>
           );
         })}
+        {produitsFiltres.length === 0 && (
+          <p style={{ color: "#9ca3af" }}>Aucun produit ne correspond à cette recherche.</p>
+        )}
       </div>
 
       {detail && (

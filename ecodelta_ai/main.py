@@ -1,4 +1,6 @@
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, Form, File, UploadFile
+from fastapi.staticfiles import StaticFiles
+import os, uuid, shutil
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
@@ -12,6 +14,10 @@ from fastapi.security import OAuth2PasswordRequestForm
 from auth import verifier_mot_de_passe, creer_token, get_current_user
 
 app = FastAPI(title="Ecodelta API", version="2.0")
+
+UPLOAD_DIR = "uploads"
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
 app.add_middleware(
     CORSMiddleware,
@@ -195,25 +201,35 @@ def liste_produits():
     return resultats
 
 
-class ProduitCreate(BaseModel):
-    nom: str
-    description: Optional[str] = None
-    prix_unitaire: Optional[float] = None
-    specs_techniques: Optional[str] = None
-
-
 @app.post("/produits", dependencies=[Depends(get_current_user)])
-def creer_produit(produit: ProduitCreate):
-    nom = produit.nom.strip()
+async def creer_produit(
+    nom: str = Form(...),
+    description: str = Form(None),
+    prix_unitaire: float = Form(None),
+    specs_techniques: str = Form(None),
+    image: UploadFile = File(None),
+):
+    nom = nom.strip()
     if not nom:
         raise HTTPException(status_code=400, detail="Le nom du produit ne peut pas être vide")
+
+    image_url = None
+    if image is not None and image.filename:
+        extension = image.filename.split(".")[-1].lower() if "." in image.filename else "jpg"
+        if extension not in ["jpg", "jpeg", "png", "webp", "gif"]:
+            raise HTTPException(status_code=400, detail="Format d'image non supporté")
+        nom_fichier = f"{uuid.uuid4().hex}.{extension}"
+        chemin_disque = os.path.join(UPLOAD_DIR, nom_fichier)
+        with open(chemin_disque, "wb") as f:
+            shutil.copyfileobj(image.file, f)
+        image_url = f"http://localhost:8000/uploads/{nom_fichier}"
 
     conn = get_connection()
     cur = conn.cursor()
     cur.execute(
-        """INSERT INTO produits (nom, description, prix_unitaire, specs_techniques)
-           VALUES (%s, %s, %s, %s) RETURNING id;""",
-        (nom, produit.description, produit.prix_unitaire, produit.specs_techniques),
+        """INSERT INTO produits (nom, description, prix_unitaire, specs_techniques, image_url)
+           VALUES (%s, %s, %s, %s, %s) RETURNING id;""",
+        (nom, description, prix_unitaire, specs_techniques, image_url),
     )
     nouveau_id = cur.fetchone()[0]
     conn.commit()
@@ -223,11 +239,11 @@ def creer_produit(produit: ProduitCreate):
     return {
         "id": nouveau_id,
         "nom": nom,
-        "description": produit.description,
-        "prix_unitaire": produit.prix_unitaire,
-        "specs_techniques": produit.specs_techniques,
+        "description": description,
+        "prix_unitaire": prix_unitaire,
+        "specs_techniques": specs_techniques,
         "fiche_technique": None,
-        "image_url": None,
+        "image_url": image_url,
     }
 
 
@@ -382,6 +398,84 @@ def telecharger_devis_pdf(devis_id: int):
         media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="devis_{devis_id}.pdf"'},
     )
+
+
+class MotCleCreate(BaseModel):
+    mot_cle: str
+
+
+# ---------- Mots-clés de recherche ----------
+
+@app.get("/mots-cles", dependencies=[Depends(get_current_user)])
+def liste_mots_cles():
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT id, mot_cle, actif, date_creation FROM mots_cles_recherche ORDER BY date_creation DESC;")
+    colonnes = ["id", "mot_cle", "actif", "date_creation"]
+    resultats = []
+    for row in cur.fetchall():
+        d = dict(zip(colonnes, row))
+        d["date_creation"] = d["date_creation"].isoformat() if d["date_creation"] else None
+        resultats.append(d)
+    cur.close()
+    conn.close()
+    return resultats
+
+
+@app.post("/mots-cles", dependencies=[Depends(get_current_user)])
+def creer_mot_cle(mot_cle: MotCleCreate):
+    texte = mot_cle.mot_cle.strip()
+    if not texte:
+        raise HTTPException(status_code=400, detail="Le mot-clé ne peut pas être vide")
+
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            "INSERT INTO mots_cles_recherche (mot_cle) VALUES (%s) RETURNING id;",
+            (texte,),
+        )
+        nouveau_id = cur.fetchone()[0]
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        cur.close()
+        conn.close()
+        raise HTTPException(status_code=409, detail="Ce mot-clé existe déjà")
+    cur.close()
+    conn.close()
+    return {"id": nouveau_id, "mot_cle": texte, "actif": True}
+
+
+@app.patch("/mots-cles/{mot_cle_id}", dependencies=[Depends(get_current_user)])
+def basculer_mot_cle(mot_cle_id: int):
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute(
+        "UPDATE mots_cles_recherche SET actif = NOT actif WHERE id = %s RETURNING actif;",
+        (mot_cle_id,),
+    )
+    row = cur.fetchone()
+    conn.commit()
+    cur.close()
+    conn.close()
+    if not row:
+        raise HTTPException(status_code=404, detail="Mot-clé introuvable")
+    return {"id": mot_cle_id, "actif": row[0]}
+
+
+@app.delete("/mots-cles/{mot_cle_id}", dependencies=[Depends(get_current_user)])
+def supprimer_mot_cle(mot_cle_id: int):
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("DELETE FROM mots_cles_recherche WHERE id = %s RETURNING id;", (mot_cle_id,))
+    row = cur.fetchone()
+    conn.commit()
+    cur.close()
+    conn.close()
+    if not row:
+        raise HTTPException(status_code=404, detail="Mot-clé introuvable")
+    return {"message": "Mot-clé supprimé"}
 
 
 # ---------- Statistiques de surveillance ----------

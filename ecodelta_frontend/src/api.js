@@ -160,11 +160,13 @@ export async function telechargerDevisPdf(devisId) {
 
 // ---------- Produits : ajout manuel ----------
 
-export async function creerProduit(produit) {
+export async function creerProduit(formData) {
+  // formData est un objet FormData (pas du JSON) : nécessaire pour envoyer un fichier image.
+  // Ne PAS fixer manuellement "Content-Type" ici : le navigateur doit générer lui-même
+  // l'en-tête multipart/form-data avec la bonne "boundary".
   const res = await requeteAuth(`${API_URL}/produits`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(produit),
+    body: formData,
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
