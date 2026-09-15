@@ -4,6 +4,7 @@ from db import get_connection
 from domaines import selectionner_domaines_ecodelta
 
 URL_ACCUEIL = "https://www.marchespublics.gov.ma"
+SELECTEUR_CHAMP_MOT_CLE = "#ctl0_CONTENU_PAGE_AdvancedSearch_keywordSearch"
 
 
 def parser_ao(ligne):
@@ -83,48 +84,81 @@ def aller_page_suivante(page):
         return False
 
 
+def recuperer_mots_cles_actifs():
+    """Récupère la liste des mots-clés actifs configurés depuis l'interface web."""
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT mot_cle FROM mots_cles_recherche WHERE actif = TRUE ORDER BY date_creation;")
+    mots = [row[0] for row in cur.fetchall()]
+    cur.close()
+    conn.close()
+    return mots
+
+
+def rechercher(page, mot_cle, filtrer_par_domaines, max_pages):
+    """
+    Effectue UNE recherche avancée complète (domaines + éventuellement un mot-clé),
+    en repartant depuis le formulaire à chaque fois — plus lent, mais beaucoup plus
+    fiable sur ce portail (évite les soucis de session/postback ASP.NET déjà rencontrés).
+    """
+    page.goto(URL_ACCUEIL)
+    page.wait_for_timeout(2000)
+
+    page.click("text=Recherche avancée >> nth=0")
+    page.wait_for_timeout(2000)
+
+    if filtrer_par_domaines:
+        ok = selectionner_domaines_ecodelta(page)
+        if not ok:
+            print("  (filtrage par domaines échoué — poursuite sans filtre pour cette recherche)")
+
+    if mot_cle:
+        try:
+            page.fill(SELECTEUR_CHAMP_MOT_CLE, mot_cle)
+        except Exception as e:
+            print(f"  (impossible de remplir le champ mot-clé: {e})")
+
+    page.click("#ctl0_CONTENU_PAGE_AdvancedSearch_lancerRecherche")
+    page.wait_for_timeout(3000)
+
+    try:
+        page.select_option("#ctl0_CONTENU_PAGE_resultSearch_listePageSizeTop", "500")
+    except Exception as e:
+        print(f"  (select 500/page: {e}, on continue quand même)")
+    page.wait_for_timeout(2000)
+
+    resultats = []
+    page_num = 1
+    while page_num <= max_pages:
+        nouveaux = extraire_page_courante(page)
+        resultats.extend(nouveaux)
+
+        if not aller_page_suivante(page):
+            break
+        page_num += 1
+
+    return resultats
+
+
 def scraper_ao(max_pages=15, filtrer_par_domaines=True):
+    mots_cles = recuperer_mots_cles_actifs()
     resultats = []
 
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         page = browser.new_page()
 
-        page.goto(URL_ACCUEIL)
-        page.wait_for_timeout(2000)
-
-        page.click("text=Recherche avancée >> nth=0")
-        page.wait_for_timeout(2000)
-
-        # ----- PHASE 1 : filtrage par domaines d'activité Ecodelta -----
-        if filtrer_par_domaines:
-            print("Sélection des domaines d'activité Ecodelta...")
-            ok = selectionner_domaines_ecodelta(page)
-            if not ok:
-                print("  (filtrage par domaines échoué — poursuite SANS filtre, "
-                      "à corriger : voir domaines.py)")
-        # -----------------------------------------------------------------
-
-        page.click("#ctl0_CONTENU_PAGE_AdvancedSearch_lancerRecherche")
-        page.wait_for_timeout(3000)
-
-        try:
-            page.select_option("#ctl0_CONTENU_PAGE_resultSearch_listePageSizeTop", "500")
-        except Exception as e:
-            print(f"  (select 500/page: {e}, on continue quand même)")
-        page.wait_for_timeout(2000)
-
-        page_num = 1
-        while page_num <= max_pages:
-            print(f"  -> Lecture page {page_num}...")
-            nouveaux = extraire_page_courante(page)
-            resultats.extend(nouveaux)
-
-            a_continue = aller_page_suivante(page)
-            if not a_continue:
-                print(f"  -> Fin de la pagination (page {page_num} était la dernière)")
-                break
-            page_num += 1
+        if mots_cles:
+            print(f"{len(mots_cles)} mot(s)-clé(s) actif(s) : {', '.join(mots_cles)}")
+            print("(une recherche complète — domaines + mot-clé — est relancée pour chacun)\n")
+            for mot_cle in mots_cles:
+                print(f"Recherche pour le mot-clé « {mot_cle} »...")
+                resultats_mot = rechercher(page, mot_cle, filtrer_par_domaines, max_pages)
+                print(f"  -> {len(resultats_mot)} AO trouvés pour ce mot-clé\n")
+                resultats.extend(resultats_mot)
+        else:
+            print("Aucun mot-clé actif : recherche par domaines uniquement (comportement historique).\n")
+            resultats = rechercher(page, None, filtrer_par_domaines, max_pages)
 
         browser.close()
 
@@ -162,12 +196,13 @@ def sauvegarder_en_bdd(ao_list):
     conn.commit()
     cur.close()
     conn.close()
-    print(f"{inseres} AO insérés, {ignores} déjà existants (ignorés)")
+    print(f"{inseres} AO insérés, {ignores} déjà existants (ignorés) — anti-doublon global, "
+          f"y compris entre les recherches par mot-clé différentes")
 
 
 if __name__ == "__main__":
     ao_list = scraper_ao(max_pages=15, filtrer_par_domaines=True)
-    print(f"\n{len(ao_list)} AO trouvés (après filtrage par domaines)\n")
+    print(f"\n{len(ao_list)} AO trouvés au total (toutes recherches confondues)\n")
 
     for ao in ao_list[:5]:
         print(ao)
