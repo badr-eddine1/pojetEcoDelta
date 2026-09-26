@@ -4,6 +4,7 @@ import Clients from "./components/Clients";
 import Produits from "./components/Produits";
 import MotsCles from "./components/MotsCles";
 import Login from "./components/Login";
+import Statistiques from "./components/Statistique";
 import "./App.css";
 
 export default function App() {
@@ -22,19 +23,41 @@ export default function App() {
   return (
     <div className="app">
       <nav className="navbar">
-        <img src="https://ecodelta.ma/wp-content/uploads/2024/12/web-logo.png" alt="Ecodelta" className="logo-img" />
+        <img 
+          src="https://ecodelta.ma/wp-content/uploads/2024/12/web-logo.png" 
+          alt="Ecodelta" 
+          className="logo-img" 
+        />
         <div className="nav-links">
-          <button className={page === "ao" ? "active" : ""} onClick={() => setPage("ao")}>
+          <button 
+            className={page === "ao" ? "active" : ""} 
+            onClick={() => setPage("ao")}
+          >
             Appels d'offres
           </button>
-          <button className={page === "clients" ? "active" : ""} onClick={() => setPage("clients")}>
+          <button 
+            className={page === "clients" ? "active" : ""} 
+            onClick={() => setPage("clients")}
+          >
             Clients & Devis
           </button>
-          <button className={page === "produits" ? "active" : ""} onClick={() => setPage("produits")}>
+          <button 
+            className={page === "produits" ? "active" : ""} 
+            onClick={() => setPage("produits")}
+          >
             Produits
           </button>
-          <button className={page === "mots-cles" ? "active" : ""} onClick={() => setPage("mots-cles")}>
+          <button 
+            className={page === "mots-cles" ? "active" : ""} 
+            onClick={() => setPage("mots-cles")}
+          >
             Mots-clés
+          </button>
+          <button 
+            className={page === "stats" ? "active" : ""} 
+            onClick={() => setPage("stats")}
+          >
+            Statistiques
           </button>
         </div>
         <button onClick={seDeconnecter} className="btn-deconnexion">
@@ -47,6 +70,7 @@ export default function App() {
         {page === "clients" && <Clients />}
         {page === "produits" && <Produits />}
         {page === "mots-cles" && <MotsCles />}
+        {page === "stats" && <Statistiques />}
       </main>
     </div>
   );
