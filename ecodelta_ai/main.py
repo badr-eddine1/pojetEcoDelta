@@ -12,6 +12,7 @@ from devis_pdf import generer_pdf_devis
 from fastapi.responses import Response
 from fastapi.security import OAuth2PasswordRequestForm
 from auth import verifier_mot_de_passe, creer_token, get_current_user
+from fastapi import FastAPI, HTTPException, Depends
 
 app = FastAPI(title="Ecodelta API", version="2.0")
 
@@ -309,7 +310,10 @@ def creer_devis(devis: DevisCreate):
         raise HTTPException(status_code=404, detail="Client introuvable")
 
     produits_quantites = [(p.produit_id, p.quantite) for p in devis.produits]
-    lignes, montant_total = recuperer_produits(conn, produits_quantites)
+    try:
+        lignes, montant_total = recuperer_produits(conn, produits_quantites)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
     if not lignes:
         conn.close()

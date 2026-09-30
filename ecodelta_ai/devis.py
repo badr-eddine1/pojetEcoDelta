@@ -33,8 +33,14 @@ def recuperer_produits(conn, produits_quantites):
         if not row:
             print(f"  (produit #{produit_id} introuvable, ignoré)")
             continue
-
+        if row[3] is None:
+            raise ValueError(
+                f"Le produit '{row[1]}' n'a pas encore de prix défini. "
+                f"Merci de renseigner son prix avant de l'inclure dans un devis."
+            )
         prix_unitaire = float(row[3])
+
+
         sous_total = prix_unitaire * quantite
         montant_total += sous_total
 
