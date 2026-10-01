@@ -1,4 +1,4 @@
-const API_URL = "http://localhost:8000";
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
 // ---------- Wrapper central : ajoute le jeton et gère les sessions expirées ----------
 

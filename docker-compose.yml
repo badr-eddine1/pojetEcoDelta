@@ -1,0 +1,69 @@
+# Emplacement : ProjetEcodelta/docker-compose.yml (à la racine, à côté des 3 dossiers)
+
+services:
+
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ecodelta_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./init-db:/docker-entrypoint-initdb.d   # scripts exécutés automatiquement à la 1ère création
+    ports:
+      - "5432:5432"   # pratique pour se connecter avec pgAdmin depuis l'extérieur si besoin
+
+  ecodelta_ai:
+    build: ./ecodelta_ai
+    restart: unless-stopped
+    depends_on:
+      - db
+    environment:
+      DB_HOST: db              # nom du service ci-dessus, pas "localhost"
+      DB_PORT: 5432
+      DB_NAME: ecodelta_db
+      DB_USER: postgres
+      DB_PASSWORD: ${DB_PASSWORD}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+    volumes:
+      - uploads:/app/uploads   # images produits : doivent survivre à un rebuild
+    expose:
+      - "8000"                 # accessible aux autres conteneurs, pas directement depuis l'extérieur
+
+  ecodelta_surveillance:
+    build: ./ecodelta_surveillance
+    restart: unless-stopped
+    depends_on:
+      - db
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: ecodelta_db
+      DB_USER: postgres
+      DB_PASSWORD: ${DB_PASSWORD}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      SCRAP_INTERVAL_MINUTES: ${SCRAP_INTERVAL_MINUTES:-10}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      NOTIFICATION_EMAIL_TO: ${NOTIFICATION_EMAIL_TO}
+      SEUIL_NOTIFICATION: ${SEUIL_NOTIFICATION:-7}
+
+  frontend:
+    build:
+      context: ./ecodelta_frontend
+      args:
+        VITE_API_URL: /api
+    restart: unless-stopped
+    depends_on:
+      - ecodelta_ai
+    ports:
+      - "80:80"                # seul port réellement exposé au public
+
+volumes:
+  pgdata:
+  uploads:
